@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Study Buddy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        .flashcard {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-6xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-slate-900">AI Study Buddy</h1>
+            <p class="text-slate-600 mt-2">Transform your notes into summaries, questions, and flashcards instantly.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Column: Input and Actions -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                <textarea id="study-material" class="w-full h-64 p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Paste your study material here..."></textarea>
+                
+                <div class="flex flex-wrap gap-4 mt-4">
+                    <button id="summarize-btn" class="flex-1 bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-300">Summarize</button>
+                    <button id="questions-btn" class="flex-1 bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-300">Generate Questions</button>
+                    <button id="flashcards-btn" class="flex-1 bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-300">Generate Flashcards</button>
+                    <button id="clear-btn" class="flex-1 bg-red-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-red-600 transition-colors duration-300">Clear All</button>
+                </div>
+            </div>
+
+            <!-- Right Column: Options -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold mb-4">Options</h2>
+                <div class="space-y-6">
+                    <div>
+                        <label for="num-questions" class="block mb-2 font-medium">Number of Questions: <span id="num-questions-value">3</span></label>
+                        <input id="num-questions" type="range" min="1" max="10" value="3" class="w-full">
+                    </div>
+                    <div>
+                        <label for="num-flashcards" class="block mb-2 font-medium">Number of Flashcards: <span id="num-flashcards-value">5</span></label>
+                        <input id="num-flashcards" type="range" min="1" max="20" value="5" class="w-full">
+                    </div>
+                    <div>
+                        <label for="summary-max-len" class="block mb-2 font-medium">Summary Max Length: <span id="summary-max-len-value">150</span></label>
+                        <input id="summary-max-len" type="range" min="50" max="500" value="150" class="w-full">
+                    </div>
+                     <div>
+                        <label for="summary-min-len" class="block mb-2 font-medium">Summary Min Length: <span id="summary-min-len-value">30</span></label>
+                        <input id="summary-min-len" type="range" min="10" max="100" value="30" class="w-full">
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Results Section -->
+        <div id="results-container" class="mt-8 bg-white p-6 rounded-lg shadow-md min-h-[100px]">
+            <h2 class="text-2xl font-bold mb-4">Results</h2>
+            <div id="results-content" class="text-slate-700">
+                <!-- AI generated content will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT TO CONNECT TO THE API -->
+    <script>
+        // --- Get references to all the important HTML elements ---
+        const studyMaterialInput = document.getElementById('study-material');
+        const resultsContent = document.getElementById('results-content');
+        
+        const questionsBtn = document.getElementById('questions-btn');
+        const summarizeBtn = document.getElementById('summarize-btn');
+        const flashcardsBtn = document.getElementById('flashcards-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        // Options sliders and their value displays
+        const numQuestionsSlider = document.getElementById('num-questions');
+        const numQuestionsValue = document.getElementById('num-questions-value');
+        const numFlashcardsSlider = document.getElementById('num-flashcards');
+        const numFlashcardsValue = document.getElementById('num-flashcards-value');
+        const summaryMaxSlider = document.getElementById('summary-max-len');
+        const summaryMaxValue = document.getElementById('summary-max-len-value');
+        const summaryMinSlider = document.getElementById('summary-min-len');
+        const summaryMinValue = document.getElementById('summary-min-len-value');
+
+        // --- Update slider value displays on input ---
+        numQuestionsSlider.addEventListener('input', () => { numQuestionsValue.textContent = numQuestionsSlider.value; });
+        numFlashcardsSlider.addEventListener('input', () => { numFlashcardsValue.textContent = numFlashcardsSlider.value; });
+        summaryMaxSlider.addEventListener('input', () => { summaryMaxValue.textContent = summaryMaxSlider.value; });
+        summaryMinSlider.addEventListener('input', () => { summaryMinValue.textContent = summaryMinSlider.value; });
+
+        // --- Master function to call the API ---
+        async function callApi(action, options) {
+            const text = studyMaterialInput.value;
+            if (!text.trim()) {
+                alert('Please paste some text into the box first.');
+                return null;
+            }
+
+            resultsContent.innerHTML = '<div class="loader"></div>';
+
+            const requestData = { text, action, options };
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    resultsContent.innerHTML = `<p class="text-red-500">Error: ${errorData.error || 'Something went wrong.'}</p>`;
+                    return null;
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                resultsContent.innerHTML = '<p class="text-red-500">A network error occurred. Is the server running?</p>';
+                return null;
+            }
+        }
+
+        // --- Event Listeners for action buttons ---
+        questionsBtn.addEventListener('click', async () => {
+            const options = { num_questions: numQuestionsSlider.value };
+            const result = await callApi('generate_questions', options);
+
+            if (result && result.questions && result.questions.length > 0) {
+                const questionsHtml = result.questions.map(qa => `
+                    <div class="mb-4 p-3 bg-slate-50 rounded-md">
+                        <p class="font-semibold">Q: ${qa.question}</p>
+                        <p>A: ${qa.answer}</p>
+                    </div>
+                `).join('');
+                resultsContent.innerHTML = questionsHtml;
+            } else if (result) {
+                resultsContent.innerHTML = '<p>No questions could be generated.</p>';
+            }
+        });
+
+        summarizeBtn.addEventListener('click', async () => {
+            const options = { 
+                summary_min_len: summaryMinSlider.value,
+                summary_max_len: summaryMaxSlider.value
+            };
+            const result = await callApi('summarize', options);
+            
+            if (result && result.summary) {
+                resultsContent.innerHTML = `<p>${result.summary}</p>`;
+            } else if (result) {
+                resultsContent.innerHTML = '<p>Could not generate a summary.</p>';
+            }
+        });
+
+        flashcardsBtn.addEventListener('click', async () => {
+            const options = { num_flashcards: numFlashcardsSlider.value };
+            const result = await callApi('generate_flashcards', options);
+
+            if (result && result.flashcards && result.flashcards.length > 0) {
+                const flashcardsHtml = result.flashcards.map(card => `
+                    <div class="flashcard">
+                        <p class="font-bold text-lg">${card.question}</p>
+                        <p class="text-slate-600">${card.answer}</p>
+                    </div>
+                `).join('');
+                resultsContent.innerHTML = flashcardsHtml;
+            } else if (result) {
+                resultsContent.innerHTML = '<p>No flashcards could be generated.</p>';
+            }
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            studyMaterialInput.value = '';
+            resultsContent.innerHTML = '';
+        });
+    </script>
+
+</body>
+</html>
+
+
