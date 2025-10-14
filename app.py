@@ -3,6 +3,15 @@ from flask import Flask, render_template, request, jsonify
 import nltk
 import os
 from dotenv import load_dotenv
+import spacy
+
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    import spacy.cli
+    spacy.cli.download("en_core_web_sm")
+    nlp = spacy.load("en_core_web_sm")
+
 
 # Load environment variables from .env file
 load_dotenv() 
