@@ -53,7 +53,7 @@ python -c "import nltk; nltk.download('punkt')"
 
 Run the app:
 
-streamlit run app.py
+ streamlit run app.py
 
 Deployment
 https://ai-study-buddy-dcplyxeoput8uqqt4nz8br.streamlit.app/
