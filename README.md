@@ -1,4 +1,6 @@
 AI Study Buddy
+
+
 AI Study Buddy is a Streamlit web app that generates summaries, questions, and flashcards from any study material to speed up learning and revision.
 
 Features
