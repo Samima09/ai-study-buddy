@@ -1,19 +1,26 @@
 import random
 import nltk
+from transformers import pipeline
+import os
 
-# Ensure NLTK tokenizer is ready
+# Download NLTK punkt tokenizer
 nltk.download('punkt')
 
+# Load Hugging Face API token from environment
+HF_TOKEN = os.getenv("HF_TOKEN")
 
-# 1️⃣ Summarization function (lazy import transformers)
+# Initialize summarization pipeline using Hugging Face API
+summarizer = pipeline(
+    "summarization",
+    model="facebook/bart-large-cnn",
+    use_auth_token=HF_TOKEN,
+    device=-1  # CPU
+)
+
 def generate_summary(text, min_length=30, max_length=150):
-    from transformers import pipeline  # Import only when needed
-    summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
     summary = summarizer(text, min_length=min_length, max_length=max_length)
     return summary[0].get('summary_text', '')
 
-
-# 2️⃣ Question generation function
 def generate_questions(text, num_questions=3):
     sentences = nltk.sent_tokenize(text)
     if not sentences:
@@ -22,8 +29,6 @@ def generate_questions(text, num_questions=3):
     questions = [{'answer': ans} for ans in answers]
     return questions
 
-
-# 3️⃣ Flashcards function
 def generate_flashcards(text, num_flashcards=5):
     sentences = nltk.sent_tokenize(text)
     if not sentences:
