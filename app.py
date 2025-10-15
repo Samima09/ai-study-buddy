@@ -1,204 +1,100 @@
 # app.py
-from flask import Flask, render_template, request, jsonify
-import nltk
-import os
+import streamlit as st
 from dotenv import load_dotenv
-import spacy
+import os
 
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    import spacy.cli
-    spacy.cli.download("en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm")
+# Load environment variables
+load_dotenv()
+SECRET_KEY = os.getenv("SECRET_KEY")
 
+# Now you can use SECRET_KEY anywhere in your app
+st.write("Secret key loaded successfully!")  # just to test
 
-# Load environment variables from .env file
-load_dotenv() 
+import nltk
 
 from ai_core import generate_summary, generate_questions, generate_flashcards
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Ensure NLTK punkt tokenizer is downloaded
+nltk.download('punkt')
 
-app = Flask(__name__)
-# Load the secret key from the environment variable
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+st.set_page_config(page_title="AI Study Buddy", layout="wide")
 
-@app.route('/')
-def index():
-    """Renders the main page of the application."""
-    return render_template('index.html')
+st.title("AI Study Buddy")
+st.write("Enter your text and choose an action to generate questions, summary, or flashcards.")
 
-def calculate_score(sentence, phrase):
-    """
-    Calculates a score for how 'definitional' a sentence is for a given phrase.
-    A lower score is better.
-    """
-    lower_sentence = sentence.lower()
-    lower_phrase = phrase.lower()
-    
-    # Base score is the position of the phrase. Lower is better.
-    score = lower_sentence.find(lower_phrase)
+# --- Input Section ---
+text = st.text_area("Enter your text here:", height=200)
 
-    # Big penalty for sentences starting with action verbs (e.g., "Orbiting").
-    first_word = sentence.split(' ')[0]
-    if first_word.endswith('ing'):
-        score += 100
-        
-    # Bonus for sentences that look like a definition (e.g., "The Sun is...").
-    if f"{lower_phrase} is" in lower_sentence or f"{lower_phrase} are" in lower_sentence:
-        score -= 20
-    
-    # Bigger bonus if the sentence starts with the key phrase.
-    if lower_sentence.startswith(lower_phrase):
-        score -= 30
+action = st.selectbox(
+    "Choose an action:",
+    ["Generate Questions", "Summarize", "Generate Flashcards"]
+)
 
-    return score
+options = {}
+if action == "Generate Questions":
+    options['num_questions'] = st.number_input("Number of Questions:", min_value=1, max_value=20, value=3)
+elif action == "Summarize":
+    options['summary_min_len'] = st.number_input("Summary Minimum Length:", min_value=10, max_value=100, value=30)
+    options['summary_max_len'] = st.number_input("Summary Maximum Length:", min_value=50, max_value=500, value=150)
+elif action == "Generate Flashcards":
+    options['num_flashcards'] = st.number_input("Number of Flashcards:", min_value=1, max_value=20, value=5)
 
-@app.route('/api/process', methods=['POST'])
-def process_api():
-    """API endpoint to process text."""
-    try:
-        data = request.get_json()
-        text = data.get('text')
-        action = data.get('action')
-        options = data.get('options', {})
+# --- Internal API-like function ---
+def process_text(text, action, options={}):
+    if action == "Generate Questions":
+        raw_results = generate_questions(text, num_questions=options.get('num_questions', 3))
+        sentences = nltk.sent_tokenize(text)
 
-        if not text or not action:
-            return jsonify({"error": "Missing 'text' or 'action' in request"}), 400
+        # Map phrases to sentences
+        results = []
+        for item in raw_results:
+            answer = item.get('answer', '')
+            if answer:
+                # Find first matching sentence
+                match = next((s for s in sentences if answer.lower() in s.lower()), answer)
+                results.append({"question": f"What is '{answer}'?", "answer": match})
+        return results
 
-        if action == 'generate_questions':
-            num_questions = int(options.get('num_questions', 3))
-            raw_results = generate_questions(text, num_questions=num_questions)
-            
-            sentences = nltk.sent_tokenize(text)
-            
-            if not raw_results:
-                return jsonify({'questions': []})
-
-            key_phrases = [item.get('answer', '') for item in raw_results if item.get('answer')]
-            
-            # --- Definitive Multi-Pass Assignment Logic for Best Unique Answers ---
-            final_assignments = {}
-            used_sentences = set()
-
-            # 1. First Pass: For each phrase, find its single best sentence candidate.
-            phrase_candidates = {}
-            for phrase in key_phrases:
-                potential_answers = [s for s in sentences if phrase.lower() in s.lower()]
-                if potential_answers:
-                    best_sentence = min(potential_answers, key=lambda s: calculate_score(s, phrase))
-                    phrase_candidates[phrase] = best_sentence
-
-            # 2. Conflict Resolution: Group phrases by their preferred sentence.
-            sentence_to_phrases = {}
-            for phrase, sentence in phrase_candidates.items():
-                if sentence not in sentence_to_phrases:
-                    sentence_to_phrases[sentence] = []
-                sentence_to_phrases[sentence].append(phrase)
-
-            # Assign sentences to the phrase that has the best score for it.
-            for sentence, conflicting_phrases in sentence_to_phrases.items():
-                if sentence in used_sentences: continue
-                
-                winner_phrase = min(conflicting_phrases, key=lambda p: calculate_score(sentence, p))
-                final_assignments[winner_phrase] = sentence
-                used_sentences.add(sentence)
-
-            # 3. Second Pass: Find answers for any phrases that lost a conflict.
-            unassigned_phrases = [p for p in key_phrases if p not in final_assignments]
-            for phrase in unassigned_phrases:
-                available_sentences = [s for s in sentences if s not in used_sentences]
-                potential_answers = [s for s in available_sentences if phrase.lower() in s.lower()]
-                if potential_answers:
-                    best_answer = min(potential_answers, key=lambda s: calculate_score(s, phrase))
-                    final_assignments[phrase] = best_answer
-                    used_sentences.add(best_answer)
-
-            # 4. Final Assembly: Build the results in the original order.
-            processed_results = []
-            for item in raw_results:
-                key_phrase = item.get('answer', '')
-                if not key_phrase: continue
-                
-                question = f"What is '{key_phrase}'?"
-                answer = final_assignments.get(key_phrase, key_phrase) # Fallback to phrase itself
-                processed_results.append({'question': question, 'answer': answer})
-            
-            return jsonify({'questions': processed_results})
-        
-        elif action == 'summarize':
-            min_len = int(options.get('summary_min_len', 30))
-            max_len = int(options.get('summary_max_len', 150))
-            summary_result = generate_summary(text, min_length=min_len, max_length=max_len)
-            
-            summary_text = ""
-            
-            # Case 1: The result is a list (most common from Hugging Face pipelines)
-            if isinstance(summary_result, list) and summary_result:
-                first_item = summary_result[0]
-                if isinstance(first_item, dict):
-                    # Find the first string value in the dictionary, regardless of the key
-                    for value in first_item.values():
-                        if isinstance(value, str):
-                            summary_text = value
-                            break 
-            
-            # Case 2: The result is a dictionary itself
-            elif isinstance(summary_result, dict):
-                for value in summary_result.values():
+    elif action == "Summarize":
+        min_len = options.get('summary_min_len', 30)
+        max_len = options.get('summary_max_len', 150)
+        summary_result = generate_summary(text, min_length=min_len, max_length=max_len)
+        # Extract string if returned as list/dict
+        if isinstance(summary_result, list) and summary_result:
+            first_item = summary_result[0]
+            if isinstance(first_item, dict):
+                for value in first_item.values():
                     if isinstance(value, str):
-                        summary_text = value
-                        break
-            
-            # Case 3: The result is just a plain string
-            elif isinstance(summary_result, str):
-                summary_text = summary_result
+                        return value
+        elif isinstance(summary_result, dict):
+            for value in summary_result.values():
+                if isinstance(value, str):
+                    return value
+        elif isinstance(summary_result, str):
+            return summary_result
+        return "No summary available."
 
-            if summary_text:
-                return jsonify({'summary': summary_text})
+    elif action == "Generate Flashcards":
+        num_flashcards = options.get('num_flashcards', 5)
+        return generate_flashcards(text, num_flashcards=num_flashcards)
 
-            # If we still haven't found the text, log the format and return the error
-            logging.error(f"Unexpected summary result format: {summary_result}")
-            return jsonify({'error': 'Could not generate a summary due to an unexpected format.'}), 500
-        
-        elif action == 'generate_flashcards':
-            num_flashcards = int(options.get('num_flashcards', 5))
-            flashcards = generate_flashcards(text, num_flashcards=num_flashcards)
-            return jsonify({'flashcards': flashcards})
+    return None
 
-        else:
-            return jsonify({"error": "Invalid action specified"}), 400
-
-    except Exception as e:
-        logging.error(f"An error occurred during API processing: {e}")
-        return jsonify({"error": "An internal server error occurred."}), 500
-
-if __name__ == '__main__':
-    app.run(debug=False)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# --- Run button ---
+if st.button("Run"):
+    if not text.strip():
+        st.warning("Please enter some text first.")
+    else:
+        result = process_text(text, action, options)
+        st.subheader("Results:")
+        if action == "Generate Questions":
+            for idx, item in enumerate(result, 1):
+                st.write(f"Q{idx}: {item['question']}")
+                st.write(f"A{idx}: {item['answer']}")
+        elif action == "Summarize":
+            st.write(result)
+        elif action == "Generate Flashcards":
+            for idx, card in enumerate(result, 1):
+                st.write(f"Flashcard {idx}:")
+                st.write(f"Q: {card['question']}")
+                st.write(f"A: {card['answer']}")
