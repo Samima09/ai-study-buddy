@@ -1,78 +1,51 @@
-An intelligent web application built with Flask and Python that automatically generates summaries, questions, and flashcards from any study material. This tool is designed to accelerate learning and make revision more efficient.
+AI Study Buddy
 
-✨ Features
-Automatic Summarization: Paste any text and get a concise, AI-generated summary.
+AI Study Buddy is a Streamlit web app that generates summaries, questions, and flashcards from any study material to speed up learning and revision.
 
-Question Generation: Automatically create relevant questions and answers from your notes to test your knowledge.
+Features
 
-Flashcard Creation: Generate key terms and definitions as flashcards for quick revision.
+AI-powered Summarization
 
-Customizable Options: Easily adjust the number of questions, flashcards, and the length of the summary.
+Question Generation with answers
 
-Secure API: All AI processing is handled through a secure backend API.
+Flashcard Creation
 
-🛠️ Tech Stack
-Backend: Python, Flask
+Customizable options (number of questions/flashcards, summary length)
 
-AI / NLP: Hugging Face Transformers, NLTK
+Secure backend processing
 
-Frontend: HTML, CSS, JavaScript
+Tech Stack
 
-API Testing: Postman
+Python, Streamlit
 
-Environment Management: python-dotenv
+Hugging Face Transformers, NLTK
 
-🚀 Setup and Installation
-Follow these steps to get the project running on your local machine.
+python-dotenv
 
-1. Clone the Repository
-git clone [https://github.com/Samima09/ai-study-buddy.git](https://github.com/Samima09/ai-study-buddy.git)
+Setup
+git clone https://github.com/Samima09/ai-study-buddy.git
 cd ai-study-buddy
-
-2. Create and Activate a Virtual Environment
-It's recommended to use a virtual environment to manage project dependencies.
-
-On Windows:
-
 python -m venv venv
-.\venv\Scripts\activate
-
-3. Install Dependencies
-Install all the required Python libraries from the requirements.txt file.
-
+# Activate environment
+.\venv\Scripts\activate  # Windows
+source venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 
-(Note: You will need to create a requirements.txt file first. See the note below.)
 
-4. Set Up Environment Variables
-Create a file named .env in the root of your project folder and add your secret key.
+Create a .env file:
 
-SECRET_KEY="your-own-secret-key-here"
+SECRET_KEY="your-secret-key"
 
-5. Download NLTK Data
-The application requires the punkt package from NLTK. Run the following command in a Python shell:
+
+Download NLTK tokenizer:
 
 python -c "import nltk; nltk.download('punkt')"
 
-6. Run the Application
-Start the Flask server with the following command:
 
-python app.py
+Run the app:
 
-The application will be running at http://127.0.0.1:5000.
+streamlit run app.py
 
-※ Creating the requirements.txt file
-If you don't have this file yet, you can create it easily. In your terminal (with your virtual environment active), run this command. It will automatically save a list of all the libraries you used into a new file.
+Deployment
 
-pip freeze > requirements.txt
-
-Usage
-Open your web browser and navigate to http://127.0.0.1:5000.
-
-Paste your study material into the main text box.
-
-Use the sliders on the right to adjust the options as needed.
-
-Click "Summarize", "Generate Questions", or "Generate Flashcards" to process the text.
-
-The results will appear in the "Results" section at the bottom.
+https://ai-study-buddy-dcplyxeoput8uqqt4nz8br.streamlit.app/
